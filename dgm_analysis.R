@@ -71,7 +71,7 @@ for (id in unique(dfGrabenIndex$ID)) {
 #                 delim = "\t", escape_double = FALSE, 
 #                 col_types = cols(xcoord = col_number(), 
 #                                  ycoord = col_number()), trim_ws = TRUE)
-
+options(digits=20)
 df <- read_csv("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Stützpunkte_mit_Koordinaten.csv")
 
 df <- df[,c("id", "Ordnung", "vertex_index", "xcoord", "ycoord")]
@@ -187,7 +187,7 @@ ggsave(
 
 
 
-
+##################################
 
 
 

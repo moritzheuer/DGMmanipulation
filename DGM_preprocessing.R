@@ -13,7 +13,7 @@ library(readr)
 library("rdwplus")
 library(tidyverse)
 
-dem <- raster("S:/DGM_Flow_Modellierung/07_data_preprocessing/Argenschwang_DEM_50cm.tif", crs = '+init=EPSG:32632')
+dem <- raster("S:/DGM_Flow_Modellierung/05_raw_data/06_dgm/Argenschwang_Hang.tif", crs = '+init=EPSG:32632')
 Auflösung <- 0.5
 
 options(digits=20)
@@ -23,37 +23,41 @@ df <- read_csv("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Gra
 df <- df[,c("id", "Ordnung", "vertex_index", "xcoord", "ycoord")]
 
 if (Auflösung == 0.5) {
-  x_min <- 401384.25
-  x_max <- 402434.25
-  y_min <- 5530950.75
-  y_max <- 5532365.75
+  x_min <- 401485.25
+  x_max <- 402395.25
+  y_min <- 5530689.25
+  y_max <- 5532266.25
   
   df$xcoord <- df$xcoord - x_min
   df$xcoord <- floor(df$xcoord / 0.5) + 1
   
   df$ycoord <- df$ycoord - y_min
   df$ycoord <- floor(df$ycoord / 0.5) + 1
-  df$ycoord <- 2830 - df$ycoord
+  df$ycoord <- 3154 - df$ycoord
   df$ycoord <- df$ycoord + 1
 }
 
 colnames(df) <- c("id", "Ordnung", "vertex_index", "column", "row")
+df <- df[order(df$id, df$Ordnung, df$vertex_index), ]
+df$vertex_index <- df$vertex_index + 1
 
 ###########################################
 #Nachprägen der Gräben
 
 zähler <- 1
 grabenList <- c()
+ordnung <- 1
+
 for (ordnung in sort(unique(df$Ordnung))) {
   for (id in sort(unique(df$id))) {
-      #grabenZellen <- max(df[df$id == id & df$Ordnung == ordnung,]$vertex_index)
+    #grabenZellen <- max(df[df$id == id & df$Ordnung == ordnung,]$vertex_index)
     if (nrow(df[df$id == id & df$Ordnung == ordnung,]) != 0) {
       print(c(ordnung, id))
-      partDrainage <- bresenham(x = c(df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 1,]$column,
-                                      df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 0,]$column),
-                                y = c(df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 1,]$row,
-                                      df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 0,]$row))
-      for (index in (1:max(df[df$id == id & df$Ordnung == ordnung,]$vertex_index))) {
+      partDrainage <- bresenham(x = c(df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 2,]$column,
+                                      df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 1,]$column),
+                                y = c(df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 2,]$row,
+                                      df[df$id == id & df$Ordnung == ordnung & df$vertex_index == 1,]$row))
+      for (index in (2:(max(df[df$id == id & df$Ordnung == ordnung,]$vertex_index)-1))) {
         partDrainage2 <- bresenham(x = c(df[df$id == id,]$column[index+1], df[df$id == id,]$column[index]),
                                    y = c(df[df$id == id,]$row[index+1], df[df$id == id,]$row[index]))
         
@@ -66,11 +70,10 @@ for (ordnung in sort(unique(df$Ordnung))) {
   }
 }
 
-grabenNummer <- 1
 for (grabenNummer in 1:length(grabenList)) {
   print(grabenNummer)
   for (i in length(grabenList[[grabenNummer]]$x):1) {
-    print(i)
+    #print(i)
     h8 <- c(dem[grabenList[[grabenNummer]]$y[i]-1, grabenList[[grabenNummer]]$x[i]-1],
             dem[grabenList[[grabenNummer]]$y[i]-1, grabenList[[grabenNummer]]$x[i]],
             dem[grabenList[[grabenNummer]]$y[i]-1, grabenList[[grabenNummer]]$x[i]+1],
@@ -79,7 +82,8 @@ for (grabenNummer in 1:length(grabenList)) {
             dem[grabenList[[grabenNummer]]$y[i]+1, grabenList[[grabenNummer]]$x[i]-1],
             dem[grabenList[[grabenNummer]]$y[i]+1, grabenList[[grabenNummer]]$x[i]],
             dem[grabenList[[grabenNummer]]$y[i]+1, grabenList[[grabenNummer]]$x[i]+1])
-    min(h8)
+    #min(h8)
+    #print(dem[grabenList[[grabenNummer]]$y[i-1], grabenList[[grabenNummer]]$x[i-1]])
     if (min(h8) > dem[grabenList[[grabenNummer]]$y[i], grabenList[[grabenNummer]]$x[i]]) {
       dem[grabenList[[grabenNummer]]$y[i-1], grabenList[[grabenNummer]]$x[i-1]] <- 
         (dem[grabenList[[grabenNummer]]$y[i], grabenList[[grabenNummer]]$x[i]] - 0.005)
@@ -92,10 +96,9 @@ for (grabenNummer in 1:length(grabenList)) {
       dem[grabenList[[grabenNummer]]$y[i-1], grabenList[[grabenNummer]]$x[i-1]] <- 
         (dem[grabenList[[grabenNummer]]$y[i], grabenList[[grabenNummer]]$x[i]] - 0.005)
     }
+    print(c(grabenList[[grabenNummer]]$y[i-1], grabenList[[grabenNummer]]$x[i-1]))
   }
 }
-
-
 
 writeRaster(dem,
             "S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_interpol.tif",
@@ -103,130 +106,7 @@ writeRaster(dem,
             overwrite = TRUE,
             datatype = "FLT8S")
 
-temp <- raster("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_interpol.tif", crs = '+init=EPSG:32632')
 
-
-#####################################
-#Gräbenverschlüsse einprägen - Alle Verschlüsse
-dem <- raster("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_interpol.tif", crs = '+init=EPSG:32632')
-
-df <- read_csv("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Grabenverschlüsse_Vertices_Koordinaten.csv")
-
-
-df <- df[,c("id", "Type", "vertex_index", "xcoord", "ycoord")]
-
-if (Auflösung == 0.5) {
-  x_min <- 401384.25
-  x_max <- 402434.25
-  y_min <- 5530950.75
-  y_max <- 5532365.75
-  
-  #df$xcoord <- round_any(df$xcoord - x_min, 0.25)
-  
-  df$xcoord <- df$xcoord - x_min
-  df$xcoord <- floor(df$xcoord / 0.5) + 1
-  
-  df$ycoord <- df$ycoord - y_min
-  df$ycoord <- floor(df$ycoord / 0.5) + 1
-  df$ycoord <- 2830 - df$ycoord
-  df$ycoord <- df$ycoord + 1
-}
-
-colnames(df) <- c("id", "Type", "vertex_index", "column", "row")
-
-df <- df[order(df$id),]
-df$fid <- 1:nrow(df)
-df$height = NA
-
-for (fid in df$fid) {
-  df[df$fid == fid,]$height <- dem[df[df$fid == fid,]$row, df[df$fid == fid,]$column]
-}
-
-zähler <- 1
-grabenList <- c()
-id <- 1
-for (id in sort(unique(df$id))) {
-  partDrainage <- bresenham(x = c(df[df$id == id & df$vertex_index == 1,]$column,
-                                  df[df$id == id & df$vertex_index == 0,]$column),
-                            y = c(df[df$id == id & df$vertex_index == 1,]$row,
-                                  df[df$id == id & df$vertex_index == 0,]$row))
-  grabenList[[zähler]] <- as.data.frame(partDrainage)
-  zähler <- (zähler + 1)
-}
-
-for (graben in 1:length(grabenList)) {
-  for (zelle in 1:nrow(grabenList[[graben]])) {
-    dem[grabenList[[graben]][zelle, "y"], grabenList[[graben]][zelle, "x"]] <- max(df[df$id == graben, "height"])
-  }
-}
-
-writeRaster(dem,
-            "S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_Grabenverschluss.tif",
-            options = c("COMPRESS=NONE"),
-            overwrite = TRUE,
-            datatype = "FLT8S")
-
-#####################################
-#Gräbenverschlüsse einprägen - Keyline-Verschlüsse
-dem <- raster("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_interpol.tif", crs = '+init=EPSG:32632')
-
-df <- read_csv("S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Grabenverschlüsse_Vertices_Koordinaten.csv")
-
-
-df <- df[,c("id", "Type", "vertex_index", "xcoord", "ycoord")]
-
-if (Auflösung == 0.5) {
-  x_min <- 401384.25
-  x_max <- 402434.25
-  y_min <- 5530950.75
-  y_max <- 5532365.75
-  
-  #df$xcoord <- round_any(df$xcoord - x_min, 0.25)
-  
-  df$xcoord <- df$xcoord - x_min
-  df$xcoord <- floor(df$xcoord / 0.5) + 1
-  
-  df$ycoord <- df$ycoord - y_min
-  df$ycoord <- floor(df$ycoord / 0.5) + 1
-  df$ycoord <- 2830 - df$ycoord
-  df$ycoord <- df$ycoord + 1
-}
-
-colnames(df) <- c("id", "Type", "vertex_index", "column", "row")
-
-df <- df[order(df$id),]
-df$fid <- 1:nrow(df)
-df$height = NA
-
-for (fid in df$fid) {
-  df[df$fid == fid,]$height <- dem[df[df$fid == fid,]$row, df[df$fid == fid,]$column]
-}
-
-df <- df[df$Type == "Keyline",]
-
-zähler <- 1
-grabenList <- c()
-id <- 1
-for (id in sort(unique(df$id))) {
-  partDrainage <- bresenham(x = c(df[df$id == id & df$vertex_index == 1,]$column,
-                                  df[df$id == id & df$vertex_index == 0,]$column),
-                            y = c(df[df$id == id & df$vertex_index == 1,]$row,
-                                  df[df$id == id & df$vertex_index == 0,]$row))
-  grabenList[[zähler]] <- as.data.frame(partDrainage)
-  zähler <- (zähler + 1)
-}
-
-for (graben in 1:length(grabenList)) {
-  for (zelle in 1:nrow(grabenList[[graben]])) {
-    dem[grabenList[[graben]][zelle, "y"], grabenList[[graben]][zelle, "x"]] <- min(df[df$id == graben, "height"])
-  }
-}
-
-writeRaster(dem,
-            "S:/DGM_Flow_Modellierung/07_data_preprocessing/QGIS_Projekte/Argenschwang_altered_Grabenverschluss_für_Keylines.tif",
-            options = c("COMPRESS=NONE"),
-            overwrite = TRUE,
-            datatype = "FLT8S")
 
 
 bresenham <- function(x, y = NULL, close = TRUE)
